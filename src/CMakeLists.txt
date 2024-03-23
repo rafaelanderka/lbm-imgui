@@ -1,5 +1,6 @@
 # Add the executable for your application
-add_executable(lbm main.cpp)
+file(GLOB SOURCES *.cpp)
+add_executable(lbm ${SOURCES})
 
 # Include directories for your application
 target_include_directories(lbm PRIVATE ${PROJECT_SOURCE_DIR}/include)
