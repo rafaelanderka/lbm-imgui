@@ -1,7 +1,39 @@
 #include "app.h"
 
+#include <cstdlib>
+#include "imgui_internal.h"
+
+#include "util.h"
+
+const GLint WIDTH = 800;
+const GLint HEIGHT = 600;
+
+GLuint VAO;
+GLuint VBO;
+
 static void glfw_error_callback(int error, const char* description) {
   fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
+
+void create_triangles() {
+  GLfloat vertices[] = {
+    -1.0f, -1.0f, 0.0f, // 1. vertex x, y, z
+     1.0f, -1.0f, 0.0f, // 2. vertex ...
+     0.0f,  1.0f, 0.0f  // etc... 
+  };
+
+  glGenVertexArrays(1, &VAO);
+  glBindVertexArray(VAO);
+
+  glGenBuffers(1, &VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glEnableVertexAttribArray(0);
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
 }
 
 App::App() {
@@ -11,13 +43,7 @@ App::App() {
     exit(1);
 
   // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-  // GL ES 2.0 + GLSL 100
-  const char* glsl_version = "#version 100";
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
   // GL 3.2 + GLSL 150
   const char* glsl_version = "#version 150";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -29,8 +55,6 @@ App::App() {
   const char* glsl_version = "#version 130";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-  //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-  //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
 
   // Create window with graphics context
@@ -40,12 +64,51 @@ App::App() {
   glfwMakeContextCurrent(this->window);
   glfwSwapInterval(1); // Enable vsync
 
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    std::cout << "Failed to initialize GLAD" << std::endl;
+    exit(1);
+  }
+
+  // Check required features are supported
+  // if (!GLAD_GL_ARB_texture_float) {
+  //   std::cout << "Floating point textures not supported!" << std::endl;
+  //   exit(1);
+  // }
+
+  GLint maxColorAttachments;
+  glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &maxColorAttachments);
+  if(maxColorAttachments < 4) {
+    std::cout << "Your hardware supports only "
+              << maxColorAttachments
+              << " color attachments per framebuffer, but 4 are required."
+              << std::endl;
+    exit(1);
+  }
+
+  // Set up viewport
+  int bufferWidth, bufferHeight;
+  glfwGetFramebufferSize(this->window, &bufferWidth, &bufferHeight);
+  glViewport(0, 0, bufferWidth, bufferHeight);
+
+  create_triangles();
+  fbo = std::make_unique<Framebuffer>(WIDTH, HEIGHT, 1);
+
+  fs::path executablePath = getExecutablePath();
+  fs::path shadersDir = executablePath.parent_path() / "shaders";
+  fs::path vertexShaderPath = shadersDir / "vert.glsl";
+  fs::path fragmentShaderPath = shadersDir / "frag.glsl";
+
+  shader = std::make_unique<ShaderProgram>(vertexShaderPath, fragmentShaderPath);
+  shader->validate(VAO);
+
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   io = &(ImGui::GetIO()); (void)io;
   this->io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
   this->io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+  this->io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable multiple viewports support
+  this->io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();
@@ -53,9 +116,6 @@ App::App() {
 
   // Setup Platform/Renderer backends
   ImGui_ImplGlfw_InitForOpenGL(this->window, true);
-#ifdef __EMSCRIPTEN__
-  ImGui_ImplGlfw_InstallEmscriptenCanvasResizeCallback("#canvas");
-#endif
   ImGui_ImplOpenGL3_Init(glsl_version);
 
   // Load Fonts
@@ -94,10 +154,6 @@ void App::run() {
   // Main loop
   while(!glfwWindowShouldClose(this->window)) {
     // Poll and handle events (inputs, window resize, etc.)
-    // You can read the io->WantCaptureMouse, io->WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-    // - When io->WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-    // - When io->WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-    // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
     glfwPollEvents();
 
     // Start the Dear ImGui frame
@@ -105,62 +161,120 @@ void App::run() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // Main update
+    // Update GUI and process user input
     update();
 
-    // Rendering
+    // Update viewport
+    fbo->bind();
+    shader->use();
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glUseProgram(0);
+    fbo->unbind();
+
+    // Render GUI + viewport
     ImGui::Render();
     int display_w, display_h;
     glfwGetFramebufferSize(this->window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(this->clear_color.x * this->clear_color.w, this->clear_color.y * this->clear_color.w, this->clear_color.z * this->clear_color.w, this->clear_color.w);
+    glClearColor(this->clearColor.x, this->clearColor.y, this->clearColor.z, this->clearColor.w);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        GLFWwindow* backup_current_context = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_current_context);
+    }
 
     glfwSwapBuffers(this->window);
   }
 }
 
 void App::init() {
-  this->clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-  this->show_demo_window = true;
-  this->show_another_window = false;
+  this->clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  this->isInitialised = false;
 }
 
 void App::update() {
-  // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-  if (this->show_demo_window)
-    ImGui::ShowDemoWindow(&(this->show_demo_window));
+  // 1. Create the fullscreen window for the dockspace
+  auto window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+  const auto viewport = ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(viewport->Pos);
+  ImGui::SetNextWindowSize(viewport->Size);
+  ImGui::SetNextWindowViewport(viewport->ID);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+  window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+  window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
-  // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-  {
-    static float f = 0.0f;
-    static int counter = 0;
+  ImGui::Begin("Root", nullptr, window_flags);
+  ImGui::PopStyleVar(3);
 
-    ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+  // 2. Create the dockspace
+  auto dockspace_id = ImGui::GetID("Dockspace");
+  auto dockspace_flags = ImGuiDockNodeFlags_NoDockingInCentralNode | ImGuiDockNodeFlags_PassthruCentralNode;
+  ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 
-    ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-    ImGui::Checkbox("Demo Window", &(this->show_demo_window));      // Edit bools storing our window open/close state
-    ImGui::Checkbox("Another Window", &(this->show_another_window));
+  // 3. Splitting the dockspace into two vertical panes
+  static auto first_iteration = true;
+  if (first_iteration) {
+    first_iteration = false; // Ensure we only do this once
 
-    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-    ImGui::ColorEdit3("clear color", (float*)&(this->clear_color)); // Edit 3 floats representing a color
+    // Reset layout
+    ImGui::DockBuilderRemoveNode(dockspace_id);
+    ImGui::DockBuilderAddNode(dockspace_id, dockspace_flags | ImGuiDockNodeFlags_DockSpace);
 
-    if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-        counter++;
-    ImGui::SameLine();
-    ImGui::Text("counter = %d", counter);
+    // Ensure dockspace covers entire window
+    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetWindowSize());
 
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / this->io->Framerate, this->io->Framerate);
-    ImGui::End();
+    // Split the dockspace to create left, right and top panes
+    auto dock_id_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.9f, nullptr, &dockspace_id);
+    auto dock_id_right = ImGui::DockBuilderSplitNode(dock_id_left, ImGuiDir_Right, 0.3f, nullptr, &dock_id_left);
+    auto dock_id_top = dockspace_id; // Top pane uses the remaining space
+
+    // Assign default windows to the dock IDs
+    ImGui::DockBuilderDockWindow("Toolbar", dock_id_top);
+    ImGui::DockBuilderDockWindow("Viewport", dock_id_left);
+    ImGui::DockBuilderDockWindow("Settings", dock_id_right);
+    ImGui::DockBuilderFinish(dockspace_id);
   }
 
-  // 3. Show another simple window.
-  if (this->show_another_window) {
-    ImGui::Begin("Another Window", &(this->show_another_window));   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-    ImGui::Text("Hello from another window!");
-    if (ImGui::Button("Close Me"))
-        this->show_another_window = false;
-    ImGui::End();
-  }
+  // Top Pane - Toolbar
+  const float toolbarFixedHeight = 30.0f; // Example fixed height for the toolbar
+  ImGui::SetNextWindowSizeConstraints(ImVec2(-1, toolbarFixedHeight), ImVec2(-FLT_MIN, toolbarFixedHeight)); // Width is flexible, height is fixed
+  ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+  // Content for the toolbar
+  ImGui::End();
+
+  // Left Pane - Viewport
+  ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+
+  // we get the screen position of the window
+  ImVec2 pos = ImGui::GetCursorScreenPos();
+
+  // and here we can add our created texture as image to ImGui
+  const float window_width = ImGui::GetContentRegionAvail().x;
+  const float window_height = ImGui::GetContentRegionAvail().y;
+  ImGui::GetWindowDrawList()->AddImage(
+    reinterpret_cast<void*>(fbo->getTexture(0)),
+    ImVec2(pos.x, pos.y),
+    ImVec2(pos.x + window_width, pos.y + window_height),
+    ImVec2(0, 1),
+    ImVec2(1, 0)
+  );
+
+  ImGui::End();
+
+  // Right Pane - Settings
+  ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+  // Content for the settings pane
+  ImGui::End();
+
+  // Finish up the dockspace
+  ImGui::End(); // End DockSpace window
 }

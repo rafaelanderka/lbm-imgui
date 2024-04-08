@@ -1,5 +1,5 @@
 # Add the executable for your application
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES *.cpp gl/*.cpp)
 add_executable(lbm ${SOURCES})
 
 # Include directories for your application
