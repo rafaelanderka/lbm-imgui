@@ -3,37 +3,13 @@
 #include <cstdlib>
 #include "imgui_internal.h"
 
-#include "util.h"
+#include "io.h"
 
-const GLint WIDTH = 800;
-const GLint HEIGHT = 600;
-
-GLuint VAO;
-GLuint VBO;
+const GLint SIMULATION_WIDTH = 256;
+const GLint SIMULATION_HEIGHT = 256;
 
 static void glfw_error_callback(int error, const char* description) {
   fprintf(stderr, "GLFW Error %d: %s\n", error, description);
-}
-
-void create_triangles() {
-  GLfloat vertices[] = {
-    -1.0f, -1.0f, 0.0f, // 1. vertex x, y, z
-     1.0f, -1.0f, 0.0f, // 2. vertex ...
-     0.0f,  1.0f, 0.0f  // etc... 
-  };
-
-  glGenVertexArrays(1, &VAO);
-  glBindVertexArray(VAO);
-
-  glGenBuffers(1, &VBO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-  glEnableVertexAttribArray(0);
-
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindVertexArray(0);
 }
 
 App::App() {
@@ -42,20 +18,16 @@ App::App() {
   if (!glfwInit())
     exit(1);
 
-  // Decide GL+GLSL versions
-#if defined(__APPLE__)
-  // GL 3.2 + GLSL 150
-  const char* glsl_version = "#version 150";
+  // Request GL 3.3 + GLSL 330
+  const char* glsl_version = "#version 330";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
-#else
-  // GL 3.0 + GLSL 130
-  const char* glsl_version = "#version 130";
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#if defined(__APPLE__)
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);  // Required on Mac
 #endif
+  printf("Requested OpenGL version: 3.3\n");
+  printf("Requested GLSL version: 330\n");
 
   // Create window with graphics context
   this->window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
@@ -64,42 +36,23 @@ App::App() {
   glfwMakeContextCurrent(this->window);
   glfwSwapInterval(1); // Enable vsync
 
+  // Load GLAD bindings
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cout << "Failed to initialize GLAD" << std::endl;
     exit(1);
   }
 
-  // Check required features are supported
-  // if (!GLAD_GL_ARB_texture_float) {
-  //   std::cout << "Floating point textures not supported!" << std::endl;
-  //   exit(1);
-  // }
+  // Log active GPU and OpenGL version
+  printf("GPU: %s\n", glGetString(GL_RENDERER));
+  printf("Active OpenGL version: %s\n", glGetString(GL_VERSION));
 
-  GLint maxColorAttachments;
-  glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &maxColorAttachments);
-  if(maxColorAttachments < 4) {
-    std::cout << "Your hardware supports only "
-              << maxColorAttachments
-              << " color attachments per framebuffer, but 4 are required."
-              << std::endl;
-    exit(1);
-  }
+  // Check all required features are supported
+  checkFeatureSupport();
 
   // Set up viewport
   int bufferWidth, bufferHeight;
   glfwGetFramebufferSize(this->window, &bufferWidth, &bufferHeight);
   glViewport(0, 0, bufferWidth, bufferHeight);
-
-  create_triangles();
-  fbo = std::make_unique<Framebuffer>(WIDTH, HEIGHT, 1);
-
-  fs::path executablePath = getExecutablePath();
-  fs::path shadersDir = executablePath.parent_path() / "shaders";
-  fs::path vertexShaderPath = shadersDir / "vert.glsl";
-  fs::path fragmentShaderPath = shadersDir / "frag.glsl";
-
-  shader = std::make_unique<ShaderProgram>(vertexShaderPath, fragmentShaderPath);
-  shader->validate(VAO);
 
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
@@ -111,29 +64,15 @@ App::App() {
   this->io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
   // Setup Dear ImGui style
-  ImGui::StyleColorsDark();
-  //ImGui::StyleColorsLight();
+  // ImGui::StyleColorsDark();
+  ImGui::StyleColorsLight();
 
   // Setup Platform/Renderer backends
   ImGui_ImplGlfw_InitForOpenGL(this->window, true);
   ImGui_ImplOpenGL3_Init(glsl_version);
 
-  // Load Fonts
-  // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-  // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-  // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-  // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-  // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-  // - Read 'docs/FONTS.md' for more instructions and details.
-  // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-  // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
-  //io->Fonts->AddFontDefault();
-  //io->Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-  //io->Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-  //io->Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-  //io->Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-  //ImFont* font = io->Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io->Fonts->GetGlyphRangesJapanese());
-  //IM_ASSERT(font != nullptr);
+  // Setup LBM simulation
+  lbm = std::make_unique<LBM>(SIMULATION_WIDTH, SIMULATION_HEIGHT);
 }
 
 App::~App() {
@@ -145,6 +84,30 @@ App::~App() {
 
   glfwDestroyWindow(this->window);
   glfwTerminate();
+}
+
+void App::checkFeatureSupport() const {
+  // Check sufficient texture units are supported (>=9)
+  GLint maxTextureUnits;
+  glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+  if(maxTextureUnits < 9) {
+    std::cout << "Your hardware supports only "
+              << maxTextureUnits
+              << " texture units, but 9 are required."
+              << std::endl;
+    exit(1);
+  }
+
+  // Check sufficient colour attachments are supported (>=4)
+  GLint maxColorAttachments;
+  glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &maxColorAttachments);
+  if(maxColorAttachments < 4) {
+    std::cout << "Your hardware supports only "
+              << maxColorAttachments
+              << " color attachments per framebuffer, but 4 are required."
+              << std::endl;
+    exit(1);
+  }
 }
 
 void App::run() {
@@ -164,14 +127,8 @@ void App::run() {
     // Update GUI and process user input
     update();
 
-    // Update viewport
-    fbo->bind();
-    shader->use();
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
-    glUseProgram(0);
-    fbo->unbind();
+    // Update LBM simulation
+    lbm->update();
 
     // Render GUI + viewport
     ImGui::Render();
@@ -195,7 +152,7 @@ void App::run() {
 }
 
 void App::init() {
-  this->clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  this->clearColor = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
   this->isInitialised = false;
 }
 
@@ -261,7 +218,7 @@ void App::update() {
   const float window_width = ImGui::GetContentRegionAvail().x;
   const float window_height = ImGui::GetContentRegionAvail().y;
   ImGui::GetWindowDrawList()->AddImage(
-    reinterpret_cast<void*>(fbo->getTexture(0)),
+    reinterpret_cast<void*>(lbm->getOutputTexture()),
     ImVec2(pos.x, pos.y),
     ImVec2(pos.x + window_width, pos.y + window_height),
     ImVec2(0, 1),

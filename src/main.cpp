@@ -8,11 +8,10 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include "app.h"
-#include "util.h"
+#include "io.h"
 
 int main(int, char**)
 {
-
   App app;
   app.run();
   return 0;

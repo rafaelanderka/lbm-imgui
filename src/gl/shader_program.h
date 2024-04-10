@@ -22,15 +22,20 @@ public:
   ShaderProgram(const ShaderProgram&) = delete;
   ShaderProgram& operator=(const ShaderProgram&) = delete;
 
-  void use() const;
+  void use();
   void validate(GLuint VAO);
 
   // Uniform utility methods
+  void setUniform(const std::string& name, const glm::vec2& value);
   void setUniform(const std::string& name, const glm::vec3& value);
   void setUniform(const std::string& name, const glm::mat4& value);
   void setUniform(const std::string& name, GLfloat value);
+  void setUniform(const std::string& name, GLint value);
+  void setTextureUniform(const std::string& name, GLuint textureID);
+  void setTextureUniform(const std::string& name, const std::vector<GLuint>& textureIDs);
 
 private:
+  unsigned int boundTextureCount = 0;
   GLuint programId;
   std::unordered_map<std::string, GLint> uniformLocations;
 

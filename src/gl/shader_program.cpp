@@ -58,7 +58,6 @@ GLuint ShaderProgram::compileShader(GLenum type, const std::string& source) {
 }
 
 void ShaderProgram::linkProgram(GLuint vertexShader, GLuint fragmentShader) {
-  programId = glCreateProgram();
   glAttachShader(programId, vertexShader);
   glAttachShader(programId, fragmentShader);
   glLinkProgram(programId);
@@ -98,15 +97,25 @@ void ShaderProgram::cacheUniformLocations() {
 
   std::vector<GLchar> uniformNameData(256); // Adjust size as needed
   GLsizei nameLength;
-  GLint size; // Not used in this example
-  GLenum type; // Not used in this example
+  GLint size;
+  GLenum type;
 
   for (GLint i = 0; i < numUniforms; ++i) {
     glGetActiveUniform(programId, i, uniformNameData.size(), &nameLength, &size, &type, uniformNameData.data());
     std::string name(uniformNameData.begin(), uniformNameData.begin() + nameLength);
+
+    // Check and trim [0] for array uniforms
+    if (name.ends_with("[0]")) {
+      name = name.substr(0, name.length() - 3);
+    }
+
     GLint location = glGetUniformLocation(programId, name.c_str());
     uniformLocations[name] = location;
   }
+}
+
+void ShaderProgram::setUniform(const std::string& name, const glm::vec2& value) {
+  glUniform2fv(uniformLocations[name], 1, &value[0]);
 }
 
 void ShaderProgram::setUniform(const std::string& name, const glm::vec3& value) {
@@ -121,6 +130,33 @@ void ShaderProgram::setUniform(const std::string& name, GLfloat value) {
   glUniform1f(uniformLocations[name], value);
 }
 
-void ShaderProgram::use() const {
+void ShaderProgram::setUniform(const std::string& name, GLint value) {
+  glUniform1i(uniformLocations[name], value);
+}
+
+void ShaderProgram::setTextureUniform(const std::string& name, GLuint textureID) {
+  glActiveTexture(GL_TEXTURE0 + boundTextureCount); // Activate texture unit i
+  glBindTexture(GL_TEXTURE_2D, textureID);
+  glUniform1i(uniformLocations[name], boundTextureCount);
+  boundTextureCount++;
+}
+
+void ShaderProgram::setTextureUniform(const std::string& name, const std::vector<GLuint>& textureIDs) {
+  // Array to store texture units corresponding to each texture
+  std::vector<GLint> textureUnits(textureIDs.size());
+
+  for (size_t i = 0; i < textureIDs.size(); ++i) {
+    glActiveTexture(GL_TEXTURE0 + boundTextureCount); // Activate the next texture unit
+    glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
+    textureUnits[i] = boundTextureCount;
+    boundTextureCount++;
+  }
+
+  // Set the uniform to the texture units. This tells the shader where to find each texture.
+  glUniform1iv(uniformLocations[name], textureIDs.size(), &textureUnits[0]);
+}
+
+void ShaderProgram::use() {
   glUseProgram(programId);
+  boundTextureCount = 0;
 }
