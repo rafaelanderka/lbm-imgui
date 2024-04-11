@@ -18,6 +18,7 @@ public:
   void bind() const;
   static void unbind();
   void clear();
+  void resize(const glm::vec2& size);
   GLuint getTexture(unsigned int index) const;
   std::vector<GLuint>& getTextures();
   glm::vec2 getTexelSize() const;
@@ -25,10 +26,10 @@ public:
 private:
   GLuint fbo;
   std::vector<GLuint> textures;
-  unsigned int width, height;
+  unsigned int width, height, textureCount;
   glm::vec2 texelSize;
 
-  void setupTextures(unsigned int textureCount);
+  void setupTextures();
   bool checkFramebufferComplete() const;
 };
 

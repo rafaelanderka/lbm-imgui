@@ -27,5 +27,11 @@ target_include_directories(imgui PUBLIC extern/imgui extern/imgui/backends)
 target_link_libraries(imgui PUBLIC glfw)
 target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
 
+# Build ImGui Toggle
+file(GLOB IMGUI_TOGGLE_SOURCES extern/imgui_toggle/*.cpp)
+add_library(imgui_toggle STATIC ${IMGUI_TOGGLE_SOURCES})
+target_include_directories(imgui_toggle PUBLIC extern/imgui_toggle)
+target_link_libraries(imgui_toggle PUBLIC imgui)
+
 # Add your application's source directory
 add_subdirectory(src)

@@ -8,6 +8,7 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #include "lbm/lbm.h"
+#include "app_state.h"
 
 class App {
 public:
@@ -17,6 +18,7 @@ public:
   void run();
 
 private:
+  AppState state;
   GLFWwindow* window;
   ImGuiIO* io;
   ImVec4 clearColor;
@@ -24,6 +26,11 @@ private:
   std::unique_ptr<LBM> lbm;
 
   void init();
-  void update();
+  void updateUI();
   void checkFeatureSupport() const;
+  void insertToolbar();
+  void insertFluidSettings();
+  void insertReactionSettings();
+  void insertSoluteSettings(unsigned int soluteID);
+  void updateCursorData();
 };

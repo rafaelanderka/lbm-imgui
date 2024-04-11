@@ -4,12 +4,12 @@
 #include <iostream>
 
 Framebuffer::Framebuffer(unsigned int width, unsigned int height, unsigned int textureCount)
-  : width(width), height(height), texelSize{1. / width, 1. / height} {
+  : width(width), height(height), textureCount(textureCount), texelSize{1.f / width, 1.f / height} {
   glGenFramebuffers(1, &fbo);
+
+  setupTextures();
+
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-  setupTextures(textureCount);
-
   if (!checkFramebufferComplete()) {
     std::cerr << "Framebuffer not complete!" << std::endl;
     exit(1);
@@ -38,6 +38,22 @@ void Framebuffer::clear() {
   unbind();
 }
 
+void Framebuffer::resize(const glm::vec2& size) {
+  // Update state
+  width = size.x;
+  height = size.y;
+  texelSize = 1.f / size;
+
+  // Delete old textures
+  glDeleteTextures(textures.size(), textures.data());
+
+  // Clear the textures vector to repopulate it
+  textures.clear();
+
+  // Re-setup textures with the new dimensions
+  setupTextures();
+}
+
 GLuint Framebuffer::getTexture(unsigned int index) const {
   if (index < textures.size()) {
     return textures[index];
@@ -54,7 +70,9 @@ glm::vec2 Framebuffer::getTexelSize() const {
   return texelSize;
 }
 
-void Framebuffer::setupTextures(unsigned int textureCount) {
+void Framebuffer::setupTextures() {
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
   textures.resize(textureCount);
   glGenTextures(textureCount, textures.data());
 
@@ -76,6 +94,8 @@ void Framebuffer::setupTextures(unsigned int textureCount) {
   if (!drawBuffers.empty()) {
     glDrawBuffers(static_cast<GLsizei>(drawBuffers.size()), drawBuffers.data());
   }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 bool Framebuffer::checkFramebufferComplete() const {

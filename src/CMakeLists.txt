@@ -7,7 +7,7 @@ target_include_directories(lbm PRIVATE ${PROJECT_SOURCE_DIR}/src)
 
 # Link libraries
 find_package(OpenGL REQUIRED)
-target_link_libraries(lbm PRIVATE imgui glfw OpenGL::GL glad glm::glm-header-only)
+target_link_libraries(lbm PRIVATE imgui glfw OpenGL::GL glad glm::glm-header-only imgui_toggle)
 
 # Set executable directory
 set_target_properties(lbm PROPERTIES

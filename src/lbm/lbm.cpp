@@ -1,37 +1,17 @@
+#include <cmath>
 #include "lbm.h"
 
-const GLfloat SPEED_OF_SOUND = 0.3;
-const GLfloat INIT_FLUID_DENSITY = 1.0;
-const glm::vec2 INIT_FLUID_VELOCITY = {0., 0.};
-const GLfloat INIT_FLUID_VISCOSITY = 0.1;
-const GLfloat INIT_SOLUTE_DIFFUSIVITY_0 = 0.02;
-const GLfloat INIT_SOLUTE_DIFFUSIVITY_1 = 0.02;
-const GLfloat INIT_SOLUTE_DIFFUSIVITY_2 = 0.02;
-const GLfloat INIT_SOLUTE_CONCENTRATION = 0.0;
-
-const glm::vec3 INIT_SOLUTE_COLOR_0 = {1., 0.78, 0.};
-const glm::vec3 INIT_SOLUTE_COLOR_1 = {0.39, 0., 1.};
-const glm::vec3 INIT_SOLUTE_COLOR_2 = {0.39, 1., 0.78};
-const glm::vec2 INIT_SOLUTE_CENTER_0 = {0.4, 0.4};
-const glm::vec2 INIT_SOLUTE_CENTER_1 = {0.5, 0.6};
-const glm::vec2 INIT_SOLUTE_CENTER_2 = {0.6, 0.4};
-const GLfloat INIT_SOLUTE_RADIUS_0 = 0.25;
-const GLfloat INIT_SOLUTE_RADIUS_1 = 0.25;
-const GLfloat INIT_SOLUTE_RADIUS_2 = 0.25;
-const std::vector<GLfloat> REACTION_MOLAR_MASSES = {1, 1, 1};
-const std::vector<GLint> REACTION_STOICHIOMETRIC_COEFFS = {-1, -1, 1};
-const GLfloat INIT_REACTION_RATE = 0.01;
-
-LBM::LBM(const unsigned int width, const unsigned int height) :
-  fluid(width, height, INIT_FLUID_VISCOSITY),
-  solutes{Solute(width, height, INIT_SOLUTE_DIFFUSIVITY_0, INIT_SOLUTE_COLOR_0),
-          Solute(width, height, INIT_SOLUTE_DIFFUSIVITY_1, INIT_SOLUTE_COLOR_1),
-          Solute(width, height, INIT_SOLUTE_DIFFUSIVITY_2, INIT_SOLUTE_COLOR_2)},
-  reaction(width, height, REACTION_MOLAR_MASSES, REACTION_STOICHIOMETRIC_COEFFS, INIT_REACTION_RATE)
+LBM::LBM(const unsigned int width, const unsigned int height, const AppState& appState) :
+  appState(appState),
+  fluid(width, height, appState.fluidViscosity),
+  solutes{Solute(width, height, appState.soluteDiffusivities[0], appState.soluteColors[0]),
+          Solute(width, height, appState.soluteDiffusivities[1], appState.soluteColors[1]),
+          Solute(width, height, appState.soluteDiffusivities[2], appState.soluteColors[2])},
+  reaction(width, height, REACTION_MOLAR_MASSES, REACTION_STOICHIOMETRIC_COEFFS, appState.reactionRate)
 {
   createTriangles();
 
-  outputFBO = std::make_unique<ReadWriteFramebuffer>(width, height, 1);
+  outputFBO = std::make_unique<Framebuffer>(width, height, 1);
   nodeIdFBO = std::make_unique<ReadWriteFramebuffer>(width, height, 1);
 
   fs::path executablePath = getExecutablePath();
@@ -81,28 +61,26 @@ LBM::LBM(const unsigned int width, const unsigned int height) :
 }
 
 void LBM::setViscosity(GLfloat viscosity) {
-
+  fluid.setViscosity(viscosity);
 }
 
 void LBM::setSoluteDiffusivity(unsigned int soluteID, GLfloat diffusivity) {
-
+  solutes[soluteID].setDiffusivity(diffusivity);
 }
 
-void LBM::setSoluteColor(unsigned int soluteID, GLfloat r, GLfloat g, GLfloat b) {
-
+void LBM::setSoluteColor(unsigned int soluteID, const glm::vec3& color) {
+  solutes[soluteID].setColor(color);
 }
 
 void LBM::setReactionRate(GLfloat rate) {
-
+  reaction.setReactionRate(rate);
 }
 
 void LBM::update() {
   // Perform all simulation updates in turn
   updateNodeIDs();
   updateFluid();
-  if (isReactionEnabled) {
-    react();
-  }
+  react();
   for (int i = 0; i < solutes.size(); i++) {
     updateSolute(i);
   }
@@ -118,23 +96,30 @@ void LBM::update() {
   outputShader->setUniform("uSolute0Col", solutes[0].color);
   outputShader->setUniform("uSolute1Col", solutes[1].color);
   outputShader->setUniform("uSolute2Col", solutes[2].color);
-  outputShader->setUniform("uTexelSize", nodeIdFBO->getTexelSize());
-  outputShader->setUniform("uDrawIndicatorLines", overlayType == 1);
-  outputShader->setUniform("uDrawIndicatorArrows", overlayType == 2);
-  outputShader->setUniform("uAspect", aspectRatio);
-  outputShader->setUniform("uPhase", animationPhase);
+  outputShader->setUniform("uAspect", appState.aspectRatio);
+  outputShader->setUniform("uCursorPos", appState.cursorPos);
+  outputShader->setUniform("uAnimationPhase", wallAnimationPhase);
+  outputShader->setUniform("uToolSize", appState.toolSize);
+  outputShader->setUniform("uViewportSize", appState.viewportSize);
+  outputShader->setUniform("uViewportScale", appState.viewportScale);
+  outputShader->setUniform("uDrawIndicatorLines", appState.activeOverlay == OverlayType::Lines);
+  outputShader->setUniform("uDrawIndicatorArrows", appState.activeOverlay == OverlayType::Arrows);
+  outputShader->setUniform("uDrawCursor", appState.isSimulationFocussed);
   glBindVertexArray(vertexArray);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindVertexArray(0);
   glUseProgram(0);
   outputFBO->unbind();
-  outputFBO->swap();
-  // animationPhase += 0.01;
+  wallAnimationPhase = fmod(wallAnimationPhase - 0.1, 2 * M_PI);
 }
 
 GLuint LBM::getOutputTexture() const {
   return outputFBO->getTexture(0);
   // return nodeIdFBO->getTexture(0);
+}
+
+void LBM::resize() {
+  outputFBO->resize(appState.viewportSize);
 }
 
 void LBM::createTriangles() {
@@ -185,7 +170,7 @@ void LBM::initSolute(unsigned int soluteID, glm::vec2 center, GLfloat radius) {
   soluteInitShader->setTextureUniform("uFluidData", fluid.fbo.getTextures());
   soluteInitShader->setTextureUniform("uSoluteData", solutes[soluteID].fbo.getTextures());
   soluteInitShader->setUniform("uCenter", center);
-  soluteInitShader->setUniform("uAspect", aspectRatio);
+  soluteInitShader->setUniform("uAspect", appState.aspectRatio);
   soluteInitShader->setUniform("uInitDensity", INIT_FLUID_DENSITY);
   soluteInitShader->setUniform("uTau", solutes[soluteID].tau);
   soluteInitShader->setUniform("uRadius", radius);
@@ -198,19 +183,19 @@ void LBM::initSolute(unsigned int soluteID, glm::vec2 center, GLfloat radius) {
 }
 
 void LBM::updateNodeIDs() {
-  bool isAddingWalls = isWindowFocussed && isCursorActive && (selectedTool == 1);
-  bool isRemovingWalls = isWindowFocussed && isCursorActive && (selectedTool == 2);
+  bool isAddingWalls = appState.isSimulationFocussed && appState.isCursorActive && (appState.activeTool == ToolType::AddWall);
+  bool isRemovingWalls = appState.isSimulationFocussed && appState.isCursorActive && (appState.activeTool == ToolType::RemoveWall);
 
   nodeIdFBO->bind();
   nodeIDShader->use();
   nodeIDShader->setTextureUniform("uNodeIds", nodeIdFBO->getTexture(0));
   nodeIDShader->setUniform("uIsAddingWalls", isAddingWalls);
   nodeIDShader->setUniform("uIsRemovingWalls", isRemovingWalls);
-  nodeIDShader->setUniform("uHasVerticalWalls", hasVerticalWalls);
-  nodeIDShader->setUniform("uHasHorizontalWalls", hasHorizontalWalls);
-  nodeIDShader->setUniform("uToolSize", toolSize);
-  nodeIDShader->setUniform("uCursorPos", cursorPos);
-  nodeIDShader->setUniform("uAspect", aspectRatio);
+  nodeIDShader->setUniform("uHasVerticalWalls", appState.hasVerticalWalls);
+  nodeIDShader->setUniform("uHasHorizontalWalls", appState.hasHorizontalWalls);
+  nodeIDShader->setUniform("uToolSize", appState.toolSize);
+  nodeIDShader->setUniform("uCursorPos", appState.cursorPos);
+  nodeIDShader->setUniform("uAspect", appState.aspectRatio);
   nodeIDShader->setUniform("uTexelSize", nodeIdFBO->getTexelSize());
   glBindVertexArray(vertexArray);
   glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -221,17 +206,17 @@ void LBM::updateNodeIDs() {
 }
 
 void LBM::updateFluid() {
-  bool isApplyingForce = isWindowFocussed && isCursorActive && (selectedTool == 0);
+  bool isApplyingForce = appState.isSimulationFocussed && appState.isCursorActive && (appState.activeTool == ToolType::Force);
 
   // Perform TRT collision
   fluid.fbo.bind();
   fluidCollisionShader->use();
   fluidCollisionShader->setTextureUniform("uNodeIds", nodeIdFBO->getTexture(0));
   fluidCollisionShader->setTextureUniform("uFluidData", fluid.fbo.getTextures());
-  fluidCollisionShader->setUniform("uCursorPos", cursorPos);
-  fluidCollisionShader->setUniform("uCursorVel", cursorVel);
-  fluidCollisionShader->setUniform("uAspect", aspectRatio);
-  fluidCollisionShader->setUniform("uToolSize", toolSize);
+  fluidCollisionShader->setUniform("uCursorPos", appState.cursorPos);
+  fluidCollisionShader->setUniform("uCursorVel", appState.cursorVel);
+  fluidCollisionShader->setUniform("uAspect", appState.aspectRatio);
+  fluidCollisionShader->setUniform("uToolSize", appState.toolSize);
   fluidCollisionShader->setUniform("uInitDensity", INIT_FLUID_DENSITY);
   fluidCollisionShader->setUniform("uPlusOmega", fluid.plusOmega);
   fluidCollisionShader->setUniform("uMinusOmega", fluid.minusOmega);
@@ -260,9 +245,9 @@ void LBM::updateFluid() {
 }
 
 void LBM::updateSolute(unsigned int soluteID) {
-  bool isSoluteSelected = selectedSolute == soluteID;
-  bool isAddingConcentration = isWindowFocussed && isCursorActive && isSoluteSelected && (selectedTool == 3);
-  bool isRemovingConcentration = isWindowFocussed && isCursorActive && isSoluteSelected && (selectedTool == 4);
+  bool isSoluteSelected = appState.activeSolute == soluteID;
+  bool isAddingConcentration = appState.isSimulationFocussed && appState.isCursorActive && isSoluteSelected && (appState.activeTool == ToolType::AddSolute);
+  bool isRemovingConcentration = appState.isSimulationFocussed && appState.isCursorActive && isSoluteSelected && (appState.activeTool == ToolType::RemoveSolute);
   GLfloat concentrationSourcePolarity = (isAddingConcentration ? 1.f : 0.f) - (isRemovingConcentration ? 1.f : 0.f);
 
   // Perform TRT collision
@@ -272,9 +257,9 @@ void LBM::updateSolute(unsigned int soluteID) {
   soluteCollisionShader->setTextureUniform("uFluidData", fluid.fbo.getTextures());
   soluteCollisionShader->setTextureUniform("uSoluteData", solutes[soluteID].fbo.getTextures());
   soluteCollisionShader->setTextureUniform("uNodalReactionRate", reaction.fbo.getTexture(0));
-  soluteCollisionShader->setUniform("uCursorPos", cursorPos);
-  soluteCollisionShader->setUniform("uAspect", aspectRatio);
-  soluteCollisionShader->setUniform("uToolSize", toolSize);
+  soluteCollisionShader->setUniform("uCursorPos", appState.cursorPos);
+  soluteCollisionShader->setUniform("uAspect", appState.aspectRatio);
+  soluteCollisionShader->setUniform("uToolSize", appState.toolSize);
   soluteCollisionShader->setUniform("uConcentrationSourcePolarity", concentrationSourcePolarity);
   soluteCollisionShader->setUniform("uInitDensity", INIT_FLUID_DENSITY);
   soluteCollisionShader->setUniform("uInitConcentration", INIT_SOLUTE_CONCENTRATION);
@@ -311,7 +296,7 @@ void LBM::react() {
   reactionShader->setTextureUniform("uSolute0Data", solutes[0].fbo.getTexture(0));
   reactionShader->setTextureUniform("uSolute1Data", solutes[1].fbo.getTexture(0));
   reactionShader->setTextureUniform("uSolute2Data", solutes[2].fbo.getTexture(0));
-  reactionShader->setUniform("uReactionRate", reaction.reactionRate);
+  reactionShader->setUniform("uReactionRate", appState.isReactionEnabled ? reaction.reactionRate : 0.f);
   reactionShader->setUniform("uStoichiometricCoeff0", reaction.stoichiometricCoeffs[0]);
   reactionShader->setUniform("uStoichiometricCoeff1", reaction.stoichiometricCoeffs[1]);
   reactionShader->setUniform("uStoichiometricCoeff2", reaction.stoichiometricCoeffs[2]);
