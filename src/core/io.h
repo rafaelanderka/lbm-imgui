@@ -9,6 +9,10 @@
   #include <limits.h>
 #endif
 
+#include "glad/glad.h"
+#include "imgui.h"
+
 namespace fs = std::filesystem;
 
 fs::path getExecutablePath();
+ImTextureID loadPNG(const fs::path& imagePath);

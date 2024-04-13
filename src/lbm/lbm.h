@@ -7,21 +7,22 @@
 #include <glm.hpp>
 #include "gl/framebuffers.h"
 #include "gl/shader_program.h"
-#include "io.h"
+#include "core/io.h"
 #include "lbm/fluid.h"
 #include "lbm/solute.h"
 #include "lbm/reaction.h"
-#include "app_state.h"
+#include "core/app_state.h"
 
 class LBM {
 public:
-  LBM(const unsigned int width, const unsigned int height, const AppState& appState);
+  LBM(const unsigned int width, const unsigned int height);
 
   // Disallow copy and assignment to avoid multiple deletions of OpenGL objects
   LBM(const LBM&) = delete;
   LBM& operator=(const LBM&) = delete;
 
-  void update();
+  void updateSimulation();
+  void updateAnimationPhase();
   void setViscosity(GLfloat viscosity);
   void setSoluteDiffusivity(unsigned int soluteID, GLfloat diffusivity);
   void setSoluteColor(unsigned int soluteID, const glm::vec3& color);
@@ -31,6 +32,7 @@ public:
   void resetNodeIDs();
   void resetFluid();
   void resetSolute(unsigned int soluteID);
+  void resetAll();
 
 private:
   // Simulation parameters

@@ -31,9 +31,9 @@ void Framebuffer::unbind() {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Framebuffer::clear() {
+void Framebuffer::clear(GLfloat r, GLfloat g, GLfloat b, GLfloat a) {
   bind();
-  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  glClearColor(r, g, b, a);
   glClear(GL_COLOR_BUFFER_BIT);
   unbind();
 }
@@ -114,9 +114,9 @@ void ReadWriteFramebuffer::unbind() {
   Framebuffer::unbind();
 }
 
-void ReadWriteFramebuffer::clear() {
-  readFramebuffer->clear();
-  writeFramebuffer->clear();
+void ReadWriteFramebuffer::clear(GLfloat r, GLfloat g, GLfloat b, GLfloat a) {
+  readFramebuffer->clear(r, g, b, a);
+  writeFramebuffer->clear(r, g, b, a);
 }
 
 GLuint ReadWriteFramebuffer::getTexture(unsigned int index) const {

@@ -7,8 +7,8 @@
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
 // - Introduction, links and more at the top of imgui.cpp
 
-#include "app.h"
-#include "io.h"
+#include "core/app.h"
+#include "core/io.h"
 
 int main(int, char**)
 {

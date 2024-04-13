@@ -33,7 +33,7 @@ void main(void) {
   float concentrationSource = texture(uSoluteData[0], UV).y;
 
   // Set initial macroscopic solute concentration
-  float distanceFromCenter = length(uCenter - (uAspect * UV));
+  float distanceFromCenter = length((uCenter - UV) * uAspect);
   float isWithinCircle = (distanceFromCenter < uRadius) ? 1. : 0.;
   float isFluid = (int(texture(uNodeIds, UV).x + 0.5) == 0) ? 1. : 0.;
   float concentration = min(1., isFluid * isWithinCircle / distanceFromCenter);

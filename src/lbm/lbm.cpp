@@ -1,8 +1,8 @@
 #include <cmath>
 #include "lbm.h"
 
-LBM::LBM(const unsigned int width, const unsigned int height, const AppState& appState) :
-  appState(appState),
+LBM::LBM(const unsigned int width, const unsigned int height) :
+  appState(AppState::getInstance()),
   fluid(width, height, appState.fluidViscosity),
   solutes{Solute(width, height, appState.soluteDiffusivities[0], appState.soluteColors[0]),
           Solute(width, height, appState.soluteDiffusivities[1], appState.soluteColors[1]),
@@ -76,7 +76,7 @@ void LBM::setReactionRate(GLfloat rate) {
   reaction.setReactionRate(rate);
 }
 
-void LBM::update() {
+void LBM::updateSimulation() {
   // Perform all simulation updates in turn
   updateNodeIDs();
   updateFluid();
@@ -99,7 +99,7 @@ void LBM::update() {
   outputShader->setUniform("uAspect", appState.aspectRatio);
   outputShader->setUniform("uCursorPos", appState.cursorPos);
   outputShader->setUniform("uAnimationPhase", wallAnimationPhase);
-  outputShader->setUniform("uToolSize", appState.toolSize);
+  outputShader->setUniform("uToolSize", TOOL_SIZE_MULTIPLIER * appState.toolSize);
   outputShader->setUniform("uViewportSize", appState.viewportSize);
   outputShader->setUniform("uViewportScale", appState.viewportScale);
   outputShader->setUniform("uDrawIndicatorLines", appState.activeOverlay == OverlayType::Lines);
@@ -110,6 +110,9 @@ void LBM::update() {
   glBindVertexArray(0);
   glUseProgram(0);
   outputFBO->unbind();
+}
+
+void LBM::updateAnimationPhase() {
   wallAnimationPhase = fmod(wallAnimationPhase - 0.1, 2 * M_PI);
 }
 
@@ -193,7 +196,7 @@ void LBM::updateNodeIDs() {
   nodeIDShader->setUniform("uIsRemovingWalls", isRemovingWalls);
   nodeIDShader->setUniform("uHasVerticalWalls", appState.hasVerticalWalls);
   nodeIDShader->setUniform("uHasHorizontalWalls", appState.hasHorizontalWalls);
-  nodeIDShader->setUniform("uToolSize", appState.toolSize);
+  nodeIDShader->setUniform("uToolSize", TOOL_SIZE_MULTIPLIER * appState.toolSize);
   nodeIDShader->setUniform("uCursorPos", appState.cursorPos);
   nodeIDShader->setUniform("uAspect", appState.aspectRatio);
   nodeIDShader->setUniform("uTexelSize", nodeIdFBO->getTexelSize());
@@ -216,7 +219,7 @@ void LBM::updateFluid() {
   fluidCollisionShader->setUniform("uCursorPos", appState.cursorPos);
   fluidCollisionShader->setUniform("uCursorVel", appState.cursorVel);
   fluidCollisionShader->setUniform("uAspect", appState.aspectRatio);
-  fluidCollisionShader->setUniform("uToolSize", appState.toolSize);
+  fluidCollisionShader->setUniform("uToolSize", TOOL_SIZE_MULTIPLIER * appState.toolSize);
   fluidCollisionShader->setUniform("uInitDensity", INIT_FLUID_DENSITY);
   fluidCollisionShader->setUniform("uPlusOmega", fluid.plusOmega);
   fluidCollisionShader->setUniform("uMinusOmega", fluid.minusOmega);
@@ -259,7 +262,7 @@ void LBM::updateSolute(unsigned int soluteID) {
   soluteCollisionShader->setTextureUniform("uNodalReactionRate", reaction.fbo.getTexture(0));
   soluteCollisionShader->setUniform("uCursorPos", appState.cursorPos);
   soluteCollisionShader->setUniform("uAspect", appState.aspectRatio);
-  soluteCollisionShader->setUniform("uToolSize", appState.toolSize);
+  soluteCollisionShader->setUniform("uToolSize", TOOL_SIZE_MULTIPLIER * appState.toolSize);
   soluteCollisionShader->setUniform("uConcentrationSourcePolarity", concentrationSourcePolarity);
   soluteCollisionShader->setUniform("uInitDensity", INIT_FLUID_DENSITY);
   soluteCollisionShader->setUniform("uInitConcentration", INIT_SOLUTE_CONCENTRATION);
@@ -309,13 +312,33 @@ void LBM::react() {
 }
 
 void LBM::resetNodeIDs() {
-
+  nodeIdFBO->clear(0.0, 0.0, 0.0, 0.0);
 }
 
 void LBM::resetFluid() {
-
+  fluid.fbo.clear(0.0, 0.0, 0.0, 0.0);
+  initFluid();
 }
 
 void LBM::resetSolute(unsigned int soluteID) {
+  initSolute(soluteID, {0, 0}, 0);
+}
 
+void LBM::resetAll() {
+  // Reset everything
+  resetNodeIDs();
+  setViscosity(appState.fluidViscosity);
+  setReactionRate(appState.reactionRate);
+  resetFluid();
+  for (int i = 0; i < 3; i++) {
+    setSoluteDiffusivity(i, appState.soluteDiffusivities[i]);
+    setSoluteColor(i, appState.soluteColors[i]);
+    resetSolute(i);
+  }
+
+  // Re-initialise everything
+  initFluid();
+  initSolute(0, INIT_SOLUTE_CENTER_0, INIT_SOLUTE_RADIUS_0);
+  initSolute(1, INIT_SOLUTE_CENTER_1, INIT_SOLUTE_RADIUS_1);
+  initSolute(2, INIT_SOLUTE_CENTER_2, INIT_SOLUTE_RADIUS_2);
 }

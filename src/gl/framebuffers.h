@@ -17,7 +17,7 @@ public:
 
   void bind() const;
   static void unbind();
-  void clear();
+  void clear(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
   void resize(const glm::vec2& size);
   GLuint getTexture(unsigned int index) const;
   std::vector<GLuint>& getTextures();
@@ -45,7 +45,7 @@ public:
 
   void bind() const;
   static void unbind();
-  void clear();
+  void clear(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
   GLuint getTexture(unsigned int index) const;
   std::vector<GLuint>& getTextures();
   glm::vec2 getTexelSize() const;

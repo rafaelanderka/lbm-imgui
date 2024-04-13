@@ -13,8 +13,6 @@ target_include_directories(glad PUBLIC extern/glad/include)
 add_subdirectory(extern/glfw)
 
 # Add glm
-# add_library(glm INTERFACE)
-# target_include_directories(glm INTERFACE extern/glm)
 add_subdirectory(extern/glm)
 
 # Build ImGui
@@ -33,5 +31,9 @@ add_library(imgui_toggle STATIC ${IMGUI_TOGGLE_SOURCES})
 target_include_directories(imgui_toggle PUBLIC extern/imgui_toggle)
 target_link_libraries(imgui_toggle PUBLIC imgui)
 
-# Add your application's source directory
+# Add stb
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE extern/stb)
+
+# Add app source directory
 add_subdirectory(src)
