@@ -30,7 +30,7 @@ private:
   GLFWwindow* window;
   ImGuiIO* io;
   ImVec4 clearColor;
-  bool isInitialised;
+  bool isInitialised = false;
   std::unique_ptr<LBM> lbm;
 
   // UI elements

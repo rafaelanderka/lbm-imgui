@@ -103,10 +103,12 @@ void App::run() {
     updateUI();
 
     // Update LBM simulation
-    for (int i = 0; i < state.stepsPerFrame; i++) {
-      lbm->updateSimulation();
+    if (isInitialised) {
+      for (int i = 0; i < state.stepsPerFrame; i++) {
+        lbm->updateSimulation();
+      }
+      lbm->updateAnimationPhase();
     }
-    lbm->updateAnimationPhase();
 
     // Render GUI + viewport
     ImGui::Render();
@@ -116,14 +118,18 @@ void App::run() {
     glClearColor(this->clearColor.x, this->clearColor.y, this->clearColor.z, this->clearColor.w);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
     glfwSwapBuffers(this->window);
+
+    // Render one GUI frame before initialisation is complete
+    if (!isInitialised) {
+      glFinish();
+      isInitialised = true;
+    }
   }
 }
 
 void App::init() {
   this->clearColor = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
-  this->isInitialised = true;
 
   // Set up LBM simulation
   lbm = std::make_unique<LBM>(SIMULATION_WIDTH, SIMULATION_HEIGHT);
