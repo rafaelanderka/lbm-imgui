@@ -1,6 +1,8 @@
 #ifndef VIEWPORT_WINDOW_H
 #define VIEWPORT_WINDOW_H
 
+#include <algorithm>
+
 #include <GLFW/glfw3.h>
 #include "imgui.h"
 #include "imgui_toggle.h"
@@ -43,22 +45,22 @@ public:
 
 private:
   void updateCursorData() {
+    // Get global state
     ImGuiIO& io = ImGui::GetIO();
     AppState& appState = AppState::getInstance();
 
     // Calculate the cursor's relative position within the window
     ImVec2 viewportPos = ImGui::GetCursorScreenPos(); // Top-left corner of the window
     ImVec2 absoluteCursorPos = io.MousePos;
-    appState.cursorPos = glm::vec2((absoluteCursorPos.x - viewportPos.x) / appState.viewportSize.x * appState.viewportScale.x,
-                                1.f + (viewportPos.y - absoluteCursorPos.y) / appState.viewportSize.y * appState.viewportScale.y);
+    float cursorPosX = (absoluteCursorPos.x - viewportPos.x) / appState.viewportSize.x * appState.viewportScale.x;
+    float cursorPosY = 1.f + (viewportPos.y - absoluteCursorPos.y) / appState.viewportSize.y * appState.viewportScale.y;
 
-    // Update the data structure
-    appState.isSimulationFocussed = ImGui::IsWindowHovered();
-    auto isCursorDragging = ImGui::IsMouseDragging(0);
-    appState.isCursorActive = ImGui::IsMouseDown(0);
+    // Clamp the cursor position between [0, 1]
+    cursorPosX = std::clamp(cursorPosX, 0.f, 1.f);
+    cursorPosY = std::clamp(cursorPosY, 0.f, 1.f);
 
-    // Calculate drag velocity if dragging
-    if (isCursorDragging) {
+    // Calculate drag velocity if user is dragging
+    if (ImGui::IsMouseDragging(0)) {
       ImVec2 dragDelta = ImGui::GetMouseDragDelta(0); // Assuming left-click
       ImGui::ResetMouseDragDelta(0);
       appState.cursorVel = glm::vec2(CURSOR_FORCE_MULTIPLIER * dragDelta.x / appState.viewportSize.x * appState.viewportScale.x,
@@ -66,6 +68,12 @@ private:
     } else {
       appState.cursorVel = glm::vec2(0., 0.);
     }
+
+    // Update the global appState
+    appState.cursorPos = glm::vec2(cursorPosX, cursorPosY);
+    appState.isSimulationFocussed = ImGui::IsWindowHovered();
+    appState.isCursorActive = ImGui::IsMouseDown(0);
+
   }
 };
 
