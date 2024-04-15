@@ -16,7 +16,7 @@ const float indicatorArrowScale = 0.7;
 const float minIndicatorSpeed = 1e-7;
 
 uniform sampler2D uNodeIds;
-uniform sampler2D uFluidData[4];
+uniform sampler2D uFluidData;
 uniform sampler2D uSolute0Data;
 uniform sampler2D uSolute1Data;
 uniform sampler2D uSolute2Data;
@@ -46,7 +46,7 @@ float getToneMappedConcentration(sampler2D solute) {
 }
 
 float getToneMappedVelocity() {
-  return 0.2 * length(texture(uFluidData[0], UV).xy);
+  return 0.2 * length(texture(uFluidData, UV).xy);
 }
 
 float signedDistanceSegment(vec2 p, vec2 offset) {
@@ -86,18 +86,19 @@ void main(void) {
   vec4 soluteBlend = vec4(1.) - ((vec4(1.) - solute0) * (vec4(1.) - solute1) * (vec4(1.) - solute2) * (vec4(1.) - velocity));
 
   // Fix premultiplied alpha fringing
-  soluteBlend = vec4(soluteBlend.x / soluteBlend.w, soluteBlend.y / soluteBlend.w, soluteBlend.z / soluteBlend.w, soluteBlend.w);
+  if (soluteBlend.w > 0.f) {
+    soluteBlend = vec4(soluteBlend.x / soluteBlend.w, soluteBlend.y / soluteBlend.w, soluteBlend.z / soluteBlend.w, soluteBlend.w);
+  }
 
   // Add background color
   vec2 pixelCoords = vec2(gl_FragCoord.x, gl_FragCoord.y) / uViewportScale;
   vec3 nodalBackgroundCol = (mod(pixelCoords.x, doubleCheckerSize) < checkerSize) != (mod(pixelCoords.y, doubleCheckerSize) < checkerSize) ? backgroundCol1 : backgroundCol2;
-  soluteBlend = vec4(soluteBlend.xyz * soluteBlend.w + nodalBackgroundCol * (1 - soluteBlend.w), 1.);
+  soluteBlend = vec4(soluteBlend.xyz * soluteBlend.w + nodalBackgroundCol * (1.f - soluteBlend.w), 1.);
 
   // Determine nearest indicator data
-  // vec2 indicatorUV = getIndicatorUV();
   vec2 indicatorPixelLoc = pixelCoords - vec2(mod(pixelCoords.x, indicatorOffset), mod(pixelCoords.y, indicatorOffset)) + indicatorOffset / 2;
   vec2 indicatorUV = indicatorPixelLoc * uViewportScale / uViewportSize;
-  vec2 indicatorVel = texture(uFluidData[0], indicatorUV).xy * uViewportScale * uAspect / uViewportSize * 128.f;
+  vec2 indicatorVel = texture(uFluidData, indicatorUV).xy * uViewportScale * uAspect / uViewportSize * 128.f;
   float indicatorSpeed = dot(indicatorVel, indicatorVel);
 
   // Calculate indicator line shading

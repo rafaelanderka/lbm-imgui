@@ -89,7 +89,7 @@ void LBM::updateSimulation() {
   outputFBO->bind();
   outputShader->use();
   outputShader->setTextureUniform("uNodeIds", nodeIdFBO->getTexture(0));
-  outputShader->setTextureUniform("uFluidData", fluid.fbo.getTextures());
+  outputShader->setTextureUniform("uFluidData", fluid.fbo.getTexture(0));
   outputShader->setTextureUniform("uSolute0Data", solutes[0].fbo.getTexture(0));
   outputShader->setTextureUniform("uSolute1Data", solutes[1].fbo.getTexture(0));
   outputShader->setTextureUniform("uSolute2Data", solutes[2].fbo.getTexture(0));
