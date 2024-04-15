@@ -58,20 +58,18 @@ App::App() : state(AppState::getInstance()) {
   glfwGetFramebufferSize(this->window, &bufferWidth, &bufferHeight);
   glViewport(0, 0, bufferWidth, bufferHeight);
 
-  // Setup Dear ImGui context
+  // Set up Dear ImGui context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   io = &(ImGui::GetIO()); (void)io;
   this->io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
   this->io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-  this->io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable multiple viewports support
   this->io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
-  // Setup Dear ImGui style
-  // ImGui::StyleColorsDark();
+  // Set up Dear ImGui style
   ImGui::StyleColorsLight();
 
-  // Setup Platform/Renderer backends
+  // Set up Platform/Renderer backends
   ImGui_ImplGlfw_InitForOpenGL(this->window, true);
   ImGui_ImplOpenGL3_Init(glsl_version);
 }
@@ -119,14 +117,6 @@ void App::run() {
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        GLFWwindow* backup_current_context = glfwGetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_current_context);
-    }
-
     glfwSwapBuffers(this->window);
   }
 }
@@ -135,7 +125,7 @@ void App::init() {
   this->clearColor = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
   this->isInitialised = true;
 
-  // Setup LBM simulation
+  // Set up LBM simulation
   lbm = std::make_unique<LBM>(SIMULATION_WIDTH, SIMULATION_HEIGHT);
 }
 
@@ -210,7 +200,7 @@ void App::updateUI() {
   if (first_iteration) {
     ImGui::SetWindowFocus("Fluid Settings");
     ImGui::SetWindowFocus("Solute 1");
-    first_iteration = false; // Ensure we only do the setup steps once
+    first_iteration = false; // Ensure we only do the setup once
   }
 }
 
