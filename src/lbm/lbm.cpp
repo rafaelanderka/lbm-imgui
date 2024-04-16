@@ -54,6 +54,12 @@ LBM::LBM(const unsigned int width, const unsigned int height) :
   outputShader = std::make_unique<ShaderProgram>(vertexShaderPath, outputShaderPath);
   outputShader->validate(vertexArray);
 
+  // Clear all FBOs
+  nodeIdFBO->clear(0.0, 0.0, 0.0, 0.0);
+  fluid.fbo.clear(0.0, 0.0, 0.0, 0.0);
+  for (int i = 0; i < 3; i++) {
+    solutes[i].fbo.clear(0.0, 0.0, 0.0, 0.0);
+  }
   initFluid();
   initSolute(0, INIT_SOLUTE_CENTER_0, INIT_SOLUTE_RADIUS_0);
   initSolute(1, INIT_SOLUTE_CENTER_1, INIT_SOLUTE_RADIUS_1);
@@ -321,6 +327,7 @@ void LBM::resetFluid() {
 }
 
 void LBM::resetSolute(unsigned int soluteID) {
+  solutes[soluteID].fbo.clear(0.0, 0.0, 0.0, 0.0);
   initSolute(soluteID, {0, 0}, 0);
 }
 
