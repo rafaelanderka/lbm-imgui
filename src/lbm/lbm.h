@@ -1,17 +1,19 @@
 #ifndef LBM_H
 #define LBM_H
 
+#include <array>
 #include <iostream>
 
 #include <glad/glad.h>
 #include <glm.hpp>
+
+#include "core/io.h"
+#include "core/app_state.h"
 #include "gl/framebuffers.h"
 #include "gl/shader_program.h"
-#include "core/io.h"
 #include "lbm/fluid.h"
-#include "lbm/solute.h"
 #include "lbm/reaction.h"
-#include "core/app_state.h"
+#include "lbm/solute.h"
 
 class LBM {
 public:
