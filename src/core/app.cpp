@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include "imgui_internal.h"
 #include "imgui_toggle.h"
@@ -13,7 +14,7 @@ static void glfw_error_callback(int error, const char* description) {
   fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-App::App() : state(AppState::getInstance()) {
+App::App() {
   // Set up app window
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit())
@@ -104,7 +105,7 @@ void App::run() {
 
     // Update LBM simulation
     if (isInitialised) {
-      for (int i = 0; i < state.stepsPerFrame; i++) {
+      for (int i = 0; i < AppState::getInstance().stepsPerFrame; i++) {
         lbm->updateSimulation();
       }
       lbm->updateAnimationPhase();
@@ -132,7 +133,17 @@ void App::init() {
   this->clearColor = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
 
   // Set up LBM simulation
-  lbm = std::make_unique<LBM>(SIMULATION_WIDTH, SIMULATION_HEIGHT);
+  lbm = std::make_shared<LBM>(SIMULATION_WIDTH, SIMULATION_HEIGHT);
+
+  // Set up windows
+  windows.reserve(7);
+  windows.push_back(std::make_shared<ToolbarWindow>(lbm));
+  windows.push_back(std::make_shared<ViewportWindow>(lbm, window));
+  windows.push_back(std::make_shared<FluidSettingsWindow>(lbm));
+  windows.push_back(std::make_shared<ReactionSettingsWindow>(lbm));
+  windows.push_back(std::make_shared<SoluteSettingsWindow>(lbm, 0));
+  windows.push_back(std::make_shared<SoluteSettingsWindow>(lbm, 1));
+  windows.push_back(std::make_shared<SoluteSettingsWindow>(lbm, 2));
 }
 
 void App::updateUI() {
@@ -186,19 +197,9 @@ void App::updateUI() {
     ImGui::DockBuilderFinish(dockspace_id);
   }
 
-  // Above the dockspace - Toolbar
-  toolbarWindow.render(*lbm);
-
-  // Left Pane - Viewport
-  viewportWindow.render(*lbm, window);
-
-  // Right Top Pane - Fluid and Reaction Settings
-  fluidSettingsWindow.render(*lbm);
-  reactionSettingsWindow.render(*lbm);
-
-  // Right Bottom Pane - Solute Settings
-  for (auto soluteSettingsWindow : soluteSettingsWindows) {
-    soluteSettingsWindow.render(*lbm);
+  // Render all docked windows
+  for (auto& window : windows) {
+    window->render();
   }
 
   ImGui::End(); // End of the DockSpace window

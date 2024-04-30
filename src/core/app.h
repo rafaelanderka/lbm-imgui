@@ -1,6 +1,8 @@
 #ifndef APP_H
 #define APP_H
 
+#include "glad/glad.h"
+#include <GLFW/glfw3.h>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -8,8 +10,7 @@
 #include <stdio.h>
 #include <iostream>
 #define GL_SILENCE_DEPRECATION
-#include "glad/glad.h"
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+// #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #include "lbm/lbm.h"
 #include "core/app_state.h"
 #include "ui/toolbar_window.h"
@@ -20,25 +21,22 @@
 
 class App {
 public:
+  using WindowList = std::vector<std::shared_ptr<Window>>;
+
   App();
   ~App();
 
   void run();
 
 private:
-  AppState& state;
   GLFWwindow* window;
   ImGuiIO* io;
   ImVec4 clearColor;
   bool isInitialised = false;
-  std::unique_ptr<LBM> lbm;
+  std::shared_ptr<LBM> lbm;
 
   // UI elements
-  ToolbarWindow toolbarWindow;
-  ViewportWindow viewportWindow;
-  FluidSettingsWindow fluidSettingsWindow;
-  ReactionSettingsWindow reactionSettingsWindow;
-  std::vector<SoluteSettingsWindow> soluteSettingsWindows = {SoluteSettingsWindow(0), SoluteSettingsWindow(1), SoluteSettingsWindow(2)};
+  WindowList windows;
 
   void init();
   void updateUI();

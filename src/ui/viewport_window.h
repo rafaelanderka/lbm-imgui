@@ -5,13 +5,19 @@
 
 #include <GLFW/glfw3.h>
 #include "imgui.h"
+#include "imgui_impl_glfw.h"
 #include "imgui_toggle.h"
 
+#include "core/app_state.h"
+#include "ui/window.h"
 #include "lbm/lbm.h"
 
-class ViewportWindow {
+class ViewportWindow : public Window {
 public:
-  void render(LBM& lbm, GLFWwindow* window) {
+  ViewportWindow(std::shared_ptr<LBM> lbm, GLFWwindow* window)
+  : lbm(lbm), window(window) {}
+
+  void render() override {
     AppState& appState = AppState::getInstance();
     ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
@@ -22,7 +28,7 @@ public:
     appState.aspectRatio = aspect > 1. ? glm::vec2(aspect, 1.) : glm::vec2(1., 1. / aspect);
     if (appState.viewportSize.x != appState.viewportScale.x * viewportSize.x || appState.viewportSize.y != appState.viewportScale.y * viewportSize.y) {
       appState.viewportSize = glm::vec2(appState.viewportScale.x * viewportSize.x, appState.viewportScale.y * viewportSize.y);
-      lbm.resize();
+      lbm->resize();
     }
 
     // Poll the cursor state over the interactive simulation viewport
@@ -33,7 +39,7 @@ public:
     const float window_width = ImGui::GetContentRegionAvail().x;
     const float window_height = ImGui::GetContentRegionAvail().y;
     ImGui::GetWindowDrawList()->AddImage(
-      reinterpret_cast<void*>(lbm.getOutputTexture()),
+      reinterpret_cast<void*>(lbm->getOutputTexture()),
       ImVec2(pos.x, pos.y),
       ImVec2(pos.x + window_width, pos.y + window_height),
       ImVec2(0, 1),
@@ -44,6 +50,9 @@ public:
   }
 
 private:
+  std::shared_ptr<LBM> lbm;
+  GLFWwindow* window;
+
   void updateCursorData() {
     // Get global state
     ImGuiIO& io = ImGui::GetIO();
@@ -73,7 +82,6 @@ private:
     appState.cursorPos = glm::vec2(cursorPosX, cursorPosY);
     appState.isSimulationFocussed = ImGui::IsWindowHovered();
     appState.isCursorActive = ImGui::IsMouseDown(0);
-
   }
 };
 

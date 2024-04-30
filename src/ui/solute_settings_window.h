@@ -2,16 +2,21 @@
 #define SOLUTE_SETTINGS_WINDOW_H
 
 #include <string>
+#include <memory>
+
 #include "imgui.h"
 #include "imgui_toggle.h"
 
+#include "core/app_state.h"
+#include "ui/window.h"
 #include "lbm/lbm.h"
 
-class SoluteSettingsWindow {
+class SoluteSettingsWindow : public Window {
 public:
-  SoluteSettingsWindow(unsigned int soluteID) : soluteID(soluteID) {}
+  SoluteSettingsWindow(std::shared_ptr<LBM> lbm, unsigned int soluteID)
+  : lbm(lbm), soluteID(soluteID) {}
 
-  void render(LBM& lbm) {
+  void render() override {
     AppState& appState = AppState::getInstance();
     ImGui::Begin(("Solute " + std::to_string(soluteID + 1)).c_str(), nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
@@ -23,7 +28,7 @@ public:
     ImGui::Text("Solute Diffusivity");
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     if (ImGui::SliderFloat(("##diffusivity" + std::to_string(soluteID)).c_str(), &appState.soluteDiffusivities[soluteID], 0.01f, 1.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-      lbm.setSoluteDiffusivity(soluteID, appState.soluteDiffusivities[soluteID]);
+      lbm->setSoluteDiffusivity(soluteID, appState.soluteDiffusivities[soluteID]);
     }
 
     // Spacing for aesthetics
@@ -39,7 +44,7 @@ public:
     ImGui::Spacing();
     ImGui::SetNextItemWidth(colorPickerWidth);
     if (ImGui::ColorPicker3(("##color" + std::to_string(soluteID)).c_str(), &appState.soluteColors[soluteID][0], ImGuiColorEditFlags_NoSidePreview)) {
-      lbm.setSoluteColor(soluteID, appState.soluteColors[soluteID]);
+      lbm->setSoluteColor(soluteID, appState.soluteColors[soluteID]);
     }
 
     ImGui::Spacing();
@@ -49,13 +54,14 @@ public:
     // Reset section
     ImGui::Text("Reset");
     if (ImGui::Button("Clear Solute")) {
-      lbm.resetSolute(soluteID);
+      lbm->resetSolute(soluteID);
     }
 
     ImGui::End(); // End of the solute settings window
   }
 
 private:
+  std::shared_ptr<LBM> lbm;
   unsigned int soluteID;
 };
 

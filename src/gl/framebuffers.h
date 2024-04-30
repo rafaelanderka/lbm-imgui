@@ -1,5 +1,5 @@
-#ifndef FRAMEBUFFER_H
-#define FRAMEBUFFER_H
+#ifndef FRAMEBUFFERS_H
+#define FRAMEBUFFERS_H
 
 #include <glad/glad.h>
 #include <glm.hpp>
@@ -56,4 +56,4 @@ private:
   std::unique_ptr<Framebuffer> writeFramebuffer;
 };
 
-#endif // FRAMEBUFFER_H
+#endif // FRAMEBUFFERS_H

@@ -10,10 +10,52 @@ LBM::LBM(const unsigned int width, const unsigned int height) :
   reaction(width, height, REACTION_MOLAR_MASSES, REACTION_STOICHIOMETRIC_COEFFS, appState.reactionRate)
 {
   createTriangles();
+  createFBOs(width, height);
+  createShaderPrograms();
 
+  // Clear all FBOs
+  nodeIdFBO->clear(0.0, 0.0, 0.0, 0.0);
+  fluid.fbo.clear(0.0, 0.0, 0.0, 0.0);
+  for (int i = 0; i < 3; i++) {
+    solutes[i].fbo.clear(0.0, 0.0, 0.0, 0.0);
+  }
+  initFluid();
+  initSolute(0, INIT_SOLUTE_CENTER_0, INIT_SOLUTE_RADIUS_0);
+  initSolute(1, INIT_SOLUTE_CENTER_1, INIT_SOLUTE_RADIUS_1);
+  initSolute(2, INIT_SOLUTE_CENTER_2, INIT_SOLUTE_RADIUS_2);
+}
+
+void LBM::createTriangles() {
+  GLfloat vertices[] = {
+      -1.0f, -1.0f, 0.0f,  // Bottom Left
+      3.0f, -1.0f, 0.0f,   // Far right, beyond viewport
+      -1.0f,  3.0f, 0.0f   // Far top, beyond viewport
+  };
+
+  // Generate and bind the VAO
+  glGenVertexArrays(1, &vertexArray);
+  glBindVertexArray(vertexArray);
+
+  // Generate and bind the VBO
+  glGenBuffers(1, &vertexBuffer);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+  // Set the vertex attributes pointers
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+  glEnableVertexAttribArray(0);
+
+  // Unbind the VBO and VAO to make sure they're not accidentally modified
+  glBindBuffer(GL_ARRAY_BUFFER, 0); 
+  glBindVertexArray(0);
+}
+
+void LBM::createFBOs(const unsigned int width, const unsigned int height) {
   outputFBO = std::make_unique<Framebuffer>(width, height, 1);
   nodeIdFBO = std::make_unique<ReadWriteFramebuffer>(width, height, 1);
+}
 
+void LBM::createShaderPrograms() {
   fs::path executablePath = getExecutablePath();
   fs::path shadersDir = executablePath.parent_path() / "shaders";
   fs::path vertexShaderPath = shadersDir / "vs_base.glsl";
@@ -53,17 +95,6 @@ LBM::LBM(const unsigned int width, const unsigned int height) :
   fs::path outputShaderPath = shadersDir / "fs_output.glsl";
   outputShader = std::make_unique<ShaderProgram>(vertexShaderPath, outputShaderPath);
   outputShader->validate(vertexArray);
-
-  // Clear all FBOs
-  nodeIdFBO->clear(0.0, 0.0, 0.0, 0.0);
-  fluid.fbo.clear(0.0, 0.0, 0.0, 0.0);
-  for (int i = 0; i < 3; i++) {
-    solutes[i].fbo.clear(0.0, 0.0, 0.0, 0.0);
-  }
-  initFluid();
-  initSolute(0, INIT_SOLUTE_CENTER_0, INIT_SOLUTE_RADIUS_0);
-  initSolute(1, INIT_SOLUTE_CENTER_1, INIT_SOLUTE_RADIUS_1);
-  initSolute(2, INIT_SOLUTE_CENTER_2, INIT_SOLUTE_RADIUS_2);
 }
 
 void LBM::setViscosity(GLfloat viscosity) {
@@ -129,31 +160,6 @@ GLuint LBM::getOutputTexture() const {
 
 void LBM::resize() {
   outputFBO->resize(appState.viewportSize);
-}
-
-void LBM::createTriangles() {
-  GLfloat vertices[] = {
-      -1.0f, -1.0f, 0.0f,  // Bottom Left
-      3.0f, -1.0f, 0.0f,   // Far right, beyond viewport
-      -1.0f,  3.0f, 0.0f   // Far top, beyond viewport
-  };
-
-  // Generate and bind the VAO
-  glGenVertexArrays(1, &vertexArray);
-  glBindVertexArray(vertexArray);
-
-  // Generate and bind the VBO
-  glGenBuffers(1, &vertexBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  // Set the vertex attributes pointers
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-  glEnableVertexAttribArray(0);
-
-  // Unbind the VBO and VAO to make sure they're not accidentally modified
-  glBindBuffer(GL_ARRAY_BUFFER, 0); 
-  glBindVertexArray(0);
 }
 
 void LBM::initFluid() {

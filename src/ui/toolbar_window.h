@@ -2,6 +2,7 @@
 #define TOOLBAR_WINDOW_H
 
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <string>
 #include "imgui.h"
@@ -9,15 +10,19 @@
 
 #include "core/app_state.h"
 #include "core/io.h"
+#include "ui/window.h"
+#include "lbm/lbm.h"
 
 struct ToolInfo {
   std::string description;
   std::string iconFilename;
 };
 
-class ToolbarWindow {
+class ToolbarWindow : public Window {
 public:
-  void render(LBM& lbm) {
+  ToolbarWindow(std::shared_ptr<LBM> lbm) : lbm(lbm) {}
+
+  void render() override {
     if (!isInitialised) init();
 
     AppState& appState = AppState::getInstance();
@@ -91,13 +96,14 @@ public:
     ImGui::SetCursorPosY(alignedCursorPosY);
     if (ImGui::Button(resetButtonLabel)) {
       appState.reset();
-      lbm.resetAll();
+      lbm->resetAll();
     }
 
     ImGui::End(); // End of the toolbar
   }
 
 private:
+  std::shared_ptr<LBM> lbm;
   std::unordered_map<ToolType, ImTextureID> toolTextures;
   std::map<ToolType, ToolInfo> tools = {
     {ToolType::Force, {"Drag fluid", "icon_tool_force_4x.png"}},

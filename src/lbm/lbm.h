@@ -29,12 +29,12 @@ public:
   void setSoluteDiffusivity(unsigned int soluteID, GLfloat diffusivity);
   void setSoluteColor(unsigned int soluteID, const glm::vec3& color);
   void setReactionRate(GLfloat rate);
-  GLuint getOutputTexture() const;
   void resize();
   void resetNodeIDs();
   void resetFluid();
   void resetSolute(unsigned int soluteID);
   void resetAll();
+  GLuint getOutputTexture() const;
 
 private:
   // Simulation parameters
@@ -66,6 +66,8 @@ private:
   std::unique_ptr<ShaderProgram> outputShader;
 
   void createTriangles();
+  void createFBOs(const unsigned int width, const unsigned int height);
+  void createShaderPrograms();
   void initFluid();
   void initSolute(unsigned int soluteID, glm::vec2 center, GLfloat radius);
   void updateNodeIDs();

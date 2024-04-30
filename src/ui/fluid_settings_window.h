@@ -1,13 +1,19 @@
 #ifndef FLUID_SETTINGS_WINDOW_H
 #define FLUID_SETTINGS_WINDOW_H
 
+#include <memory>
+
 #include "imgui.h"
 
+#include "core/app_state.h"
+#include "ui/window.h"
 #include "lbm/lbm.h"
 
-class FluidSettingsWindow {
+class FluidSettingsWindow : public Window {
 public:
-  void render(LBM& lbm) {
+  FluidSettingsWindow(std::shared_ptr<LBM> lbm) : lbm(lbm) {}
+
+  void render() override {
     AppState& appState = AppState::getInstance();
     ImGui::Begin("Fluid Settings", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
@@ -15,7 +21,7 @@ public:
     ImGui::Text("Fluid Viscosity");
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     if (ImGui::SliderFloat("##viscosity", &appState.fluidViscosity, 0.01f, 1.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-      lbm.setViscosity(appState.fluidViscosity);
+      lbm->setViscosity(appState.fluidViscosity);
     }
 
     // Spacing for aesthetics
@@ -51,15 +57,18 @@ public:
     // Reset section
     ImGui::Text("Reset");
     if (ImGui::Button("Reset Fluid")) {
-      lbm.resetFluid();
+      lbm->resetFluid();
     }
     ImGui::SameLine();
     if (ImGui::Button("Clear Walls")) {
-      lbm.resetNodeIDs();
+      lbm->resetNodeIDs();
     }
 
     ImGui::End(); // End of the fluid settings window
   }
+
+private:
+  std::shared_ptr<LBM> lbm;
 };
 
 #endif // FLUID_SETTINGS_WINDOW_H
