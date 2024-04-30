@@ -7,6 +7,3 @@
 [submodule "external/imgui_toggle"]
 	path = extern/imgui_toggle
 	url = https://github.com/cmdwtf/imgui_toggle.git
-[submodule "extern/imgui_toggle"]
-	path = extern/imgui_toggle
-	url = https://github.com/cmdwtf/imgui_toggle.git
