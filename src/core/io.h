@@ -1,5 +1,6 @@
 #include <filesystem>
 #if defined(_WIN32)
+  #define NOMINMAX
   #include <windows.h>
 #elif defined(__linux__)
   #include <unistd.h>
